@@ -39,10 +39,6 @@ SELECT
     ROUND(SUM(fla.messages_sended)::numeric / NULLIF(SUM(fla.total_chat_users), 0), 2) AS mensagens_por_usuario,
     SUM(fla.likes) AS likes,
     SUM(fla.cart_items_added) AS cart_items_added,
-<<<<<<< HEAD
-=======
-    -- Seleciona o live_type_id diretamente de fla
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
     fla.live_type_id AS live_type_id_col
 FROM fact_live_analytics fla
 JOIN dim_live dl ON fla.live_id = dl.live_id
@@ -50,20 +46,12 @@ JOIN dim_customer dc ON fla.customer_id = dc.customer_id
 WHERE dl.deleted_at IS NULL
     AND dc.deleted_at IS NULL
     AND dl.live_started_at IS NOT NULL
-<<<<<<< HEAD
     AND fla.live_type_id = '174672c7-e5b4-4878-9da7-e275cbd5d3c9'
     AND dc.fantasy_name NOT ILIKE '%mimo%'
     AND dc.fantasy_name NOT ILIKE '%teste%'
     AND dc.fantasy_name NOT IN ('Nome da Marca', 'Daninha Clow', 'Rivaw','MINHA MARCA','FIT 0/16 2023')
-<<<<<<< HEAD
-    AND fla.live_type_id = '174672c7-e5b4-4878-9da7-e275cbd5d3c9'
 
-=======
-=======
-    -- O filtro por live_type_id é aplicado AQUI, na parte da fact_live_analytics
-    AND fla.live_type_id = '174672c7-e5b4-4878-9da7-e275cbd5d3c9'
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
->>>>>>> e612e1e (Remove Teste, Mimo, Daninha Clow)
+
 GROUP BY
     dl.live_id,
     dc.fantasy_name,
@@ -73,24 +61,13 @@ GROUP BY
     fla.live_type_id
 HAVING
     SUM(fla.total_views) >= 10
-<<<<<<< HEAD
     AND SUM(fla.unique_viewers) >= 7
 
 UNION ALL
 
-<<<<<<< HEAD
-    SELECT
-=======
-=======
-    AND SUM(fla.unique_viewers) >= 5
-
-UNION ALL
 
 -- SEGUNDA PARTE: DADOS ANTIGOS (live_analytics)
--- Esta parte traz TODOS os dados (respeitando os outros filtros de "limpeza").
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
 SELECT
->>>>>>> e612e1e (Remove Teste, Mimo, Daninha Clow)
     dl.live_id,
     dc.fantasy_name,
     dc.customer_id,
@@ -106,10 +83,6 @@ SELECT
     ROUND(SUM(la.total_msgs)::numeric / NULLIF(SUM(la.total_chat_users), 0), 2) AS mensagens_por_usuario,
     SUM(la.likes) AS likes,
     SUM(la.total_cart_items_added) AS cart_items_added,
-<<<<<<< HEAD
-=======
-    -- Adiciona NULL para live_type_id_col para compatibilidade de colunas no UNION ALL
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
     NULL AS live_type_id_col
 FROM live_analytics la
 JOIN dim_live dl ON la.live_id = dl.live_id
@@ -122,13 +95,10 @@ WHERE NOT EXISTS (
     AND dl.deleted_at IS NULL
     AND dc.deleted_at IS NULL
     AND dl.live_started_at IS NOT NULL
-<<<<<<< HEAD
     AND dc.fantasy_name NOT ILIKE '%mimo%'
     AND dc.fantasy_name NOT ILIKE '%teste%'
     AND dc.fantasy_name NOT IN ('Nome da Marca', 'Daninha Clow', 'Rivaw','MINHA MARCA','FIT 0/16 2023')
-=======
-    -- NÃO HÁ FILTRO DE live_type_id AQUI, pois a live_analytics traz todos os tipos.
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
+
 GROUP BY
     dl.live_id,
     dc.fantasy_name,
@@ -137,11 +107,7 @@ GROUP BY
     dl.ends_at
 HAVING
     SUM(la.total_views) >= 10
-<<<<<<< HEAD
     AND SUM(la.unique_views) >= 7
-=======
-    AND SUM(la.unique_views) >= 5
->>>>>>> 2162436 (Atualização do código, filtro por type_id)
 
 ORDER BY live_started DESC;
 """
