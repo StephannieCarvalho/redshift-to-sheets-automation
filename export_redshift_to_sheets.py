@@ -25,88 +25,98 @@ SHEET_NAME = "dados_redshift"
 QUERY = """
 SELECT
     dl.live_id,
+    dl.title,
     dc.fantasy_name,
     dc.customer_id,
     dl.live_started_at AS live_started,
     dl.ends_at AS live_ended,
-    TO_CHAR(dl.live_started_at, 'Day') AS dia_da_semana,
-    TO_CHAR(dl.live_started_at, 'HH24:MI') AS horario,
-    SUM(fla.total_views) AS total_views,
-    SUM(fla.unique_viewers) AS unique_views,
-    SUM(fla.total_chat_users) AS total_chat_user,
+    TO_CHAR(dl.live_started_at, 'Day')      AS dia_da_semana,
+    TO_CHAR(dl.live_started_at, 'HH24:MI')  AS horario,
+    SUM(fla.total_views)                    AS total_views,
+    SUM(fla.unique_viewers)                 AS unique_views,
+    SUM(fla.total_chat_users)               AS total_chat_user,
     ROUND(SUM(fla.unique_viewers)::numeric / NULLIF(SUM(fla.total_chat_users), 0), 2) AS percentual_engajamento,
-    SUM(fla.messages_sended) AS mensagens_sended,
+    SUM(fla.messages_sended)                AS mensagens_sended,
     ROUND(SUM(fla.messages_sended)::numeric / NULLIF(SUM(fla.total_chat_users), 0), 2) AS mensagens_por_usuario,
-    SUM(fla.likes) AS likes,
-    SUM(fla.cart_items_added) AS cart_items_added,
-    fla.live_type_id AS live_type_id_col
+    SUM(fla.likes)                          AS likes,
+    SUM(fla.cart_items_added)               AS cart_items_added,
+    fla.live_type_id                        AS live_type_id_col,
+    /* sessão em segundos (parte nova já numérica) */
+    MAX(fla.session_time)::BIGINT           AS session_time_seconds
 FROM fact_live_analytics fla
-JOIN dim_live dl ON fla.live_id = dl.live_id
+JOIN dim_live     dl ON fla.live_id     = dl.live_id
 JOIN dim_customer dc ON fla.customer_id = dc.customer_id
 WHERE dl.deleted_at IS NULL
-    AND dc.deleted_at IS NULL
-    AND dl.live_started_at IS NOT NULL
-    AND fla.live_type_id = '174672c7-e5b4-4878-9da7-e275cbd5d3c9'
-    AND dc.fantasy_name NOT ILIKE '%mimo%'
-    AND dc.fantasy_name NOT ILIKE '%teste%'
-    AND dc.fantasy_name NOT IN ('Nome da Marca', 'Daninha Clow', 'Rivaw','MINHA MARCA','FIT 0/16 2023')
-
-
+  AND dc.deleted_at IS NULL
+  AND dl.live_started_at IS NOT NULL
+  AND fla.live_type_id = '174672c7-e5b4-4878-9da7-e275cbd5d3c9'
+  AND dc.fantasy_name NOT ILIKE '%mimo%'
+  AND dc.fantasy_name NOT ILIKE '%teste%'
+  AND dc.fantasy_name NOT IN ('Nome da Marca','Daninha Clow','Rivaw','MINHA MARCA','FIT 0/16 2023')
 GROUP BY
-    dl.live_id,
-    dc.fantasy_name,
-    dc.customer_id,
-    dl.live_started_at,
-    DL.ends_at,
-    fla.live_type_id
+    dl.live_id, dl.title, dc.fantasy_name, dc.customer_id,
+    dl.live_started_at, dl.ends_at, fla.live_type_id
 HAVING
-    SUM(fla.total_views) >= 10
+    SUM(fla.total_views)      >= 10
     AND SUM(fla.unique_viewers) >= 7
 
 UNION ALL
 
-
--- SEGUNDA PARTE: DADOS ANTIGOS (live_analytics)
 SELECT
     dl.live_id,
+    dl.title,
     dc.fantasy_name,
     dc.customer_id,
     dl.live_started_at AS live_started,
-    dL.ends_at AS live_ended,
-    TO_CHAR(dl.live_started_at, 'Day') AS dia_da_semana,
-    TO_CHAR(dl.live_started_at, 'HH24:MI') AS horario,
-    SUM(la.total_views) AS total_views,
-    SUM(la.unique_views) AS unique_views,
-    SUM(la.total_chat_users) AS total_chat_user,
+    dl.ends_at         AS live_ended,
+    TO_CHAR(dl.live_started_at, 'Day')      AS dia_da_semana,
+    TO_CHAR(dl.live_started_at, 'HH24:MI')  AS horario,
+    SUM(la.total_views)                      AS total_views,
+    SUM(la.unique_views)                     AS unique_views,
+    SUM(la.total_chat_users)                 AS total_chat_user,
     ROUND(SUM(la.unique_views)::numeric / NULLIF(SUM(la.total_chat_users), 0), 2) AS percentual_engajamento,
-    SUM(la.total_msgs) AS mensagens_sended,
+    SUM(la.total_msgs)                       AS mensagens_sended,
     ROUND(SUM(la.total_msgs)::numeric / NULLIF(SUM(la.total_chat_users), 0), 2) AS mensagens_por_usuario,
-    SUM(la.likes) AS likes,
-    SUM(la.total_cart_items_added) AS cart_items_added,
-    NULL AS live_type_id_col
+    SUM(la.likes)                            AS likes,
+    SUM(la.total_cart_items_added)           AS cart_items_added,
+    CAST(NULL AS VARCHAR(36))                AS live_type_id_col,
+    /* sessão em segundos (parte legada costuma ser 'HH:MM:SS' ou 'MM:SS' ou 'SS') */
+    MAX(
+        CASE
+            WHEN la.live_session_time IS NULL OR la.live_session_time = '' THEN NULL
+            /* conta quantos ':' existem */
+            WHEN (LENGTH(la.live_session_time) - LENGTH(REPLACE(la.live_session_time, ':', ''))) = 2
+                THEN  /* HH:MM:SS */
+                    (SPLIT_PART(la.live_session_time, ':', 1))::INT * 3600
+                  + (SPLIT_PART(la.live_session_time, ':', 2))::INT * 60
+                  + (SPLIT_PART(la.live_session_time, ':', 3))::INT
+            WHEN (LENGTH(la.live_session_time) - LENGTH(REPLACE(la.live_session_time, ':', ''))) = 1
+                THEN  /* MM:SS */
+                    (SPLIT_PART(la.live_session_time, ':', 1))::INT * 60
+                  + (SPLIT_PART(la.live_session_time, ':', 2))::INT
+            ELSE  /* SS (apenas número em texto) */
+                la.live_session_time::INT
+        END
+    )::BIGINT AS session_time_seconds
 FROM live_analytics la
-JOIN dim_live dl ON la.live_id = dl.live_id
+JOIN dim_live     dl ON la.live_id = dl.live_id
 JOIN dim_customer dc ON dl.customer_id = dc.customer_id
 WHERE NOT EXISTS (
     SELECT 1
     FROM fact_live_analytics fla_check
     WHERE fla_check.live_id = la.live_id
 )
-    AND dl.deleted_at IS NULL
-    AND dc.deleted_at IS NULL
-    AND dl.live_started_at IS NOT NULL
-    AND dc.fantasy_name NOT ILIKE '%mimo%'
-    AND dc.fantasy_name NOT ILIKE '%teste%'
-    AND dc.fantasy_name NOT IN ('Nome da Marca', 'Daninha Clow', 'Rivaw','MINHA MARCA','FIT 0/16 2023')
-
+  AND dl.deleted_at IS NULL
+  AND dc.deleted_at IS NULL
+  AND dl.live_started_at IS NOT NULL
+  AND dc.fantasy_name NOT ILIKE '%mimo%'
+  AND dc.fantasy_name NOT ILIKE '%teste%'
+  AND dc.fantasy_name NOT IN ('Nome da Marca','Daninha Clow','Rivaw','MINHA MARCA','FIT 0/16 2023')
 GROUP BY
-    dl.live_id,
-    dc.fantasy_name,
-    dc.customer_id,
-    dl.live_started_at,
-    dl.ends_at
+    dl.live_id, dl.title, dc.fantasy_name, dc.customer_id,
+    dl.live_started_at, dl.ends_at
 HAVING
-    SUM(la.total_views) >= 10
+    SUM(la.total_views)    >= 10
     AND SUM(la.unique_views) >= 7
 
 ORDER BY live_started DESC;
